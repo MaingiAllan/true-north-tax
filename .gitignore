@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+
+# Environment files (never commit real keys)
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Deployment
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+
+# Tests
+coverage/
+jest-test-results.json
+
+# Editors (keep shared VS Code settings if you add them)
+.idea/
