@@ -27,7 +27,13 @@ npm run dev
 ```
 
 This starts the Next.js app at [http://localhost:4028](http://localhost:4028) and the Express API
-at [http://localhost:4000](http://localhost:4000). The API applies `schema.sql` on startup.
+at [http://localhost:4000](http://localhost:4000). Browser API calls use the same-origin `/api`
+proxy, which forwards to `API_PROXY_URL` (default `http://127.0.0.1:4000`). This also allows the
+app to work when the web app is accessed through a forwarded port or development tunnel. The API
+applies `schema.sql` on startup.
+The API trusts forwarded client IP headers only from loopback by default. If `API_PROXY_URL`
+points to another host, set `TRUST_PROXY` to that proxy's IP address or CIDR; do not use a blanket
+trust setting when the API can be reached directly by untrusted clients.
 PostgreSQL must be running. Do not commit `.env.local` or share its contents. Back up
 `DATA_ENCRYPTION_KEY` securely; without it, encrypted tax and filing details cannot be read.
 
@@ -41,12 +47,27 @@ and register these callback URLs:
 
 Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Google. For Apple, set
 `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, and `APPLE_PRIVATE_KEY`; encode key newlines
-as `\n`. For a deployed site, update `NEXT_PUBLIC_SITE_URL`, `API_PUBLIC_URL`, and callback URLs
-to HTTPS addresses.
+as `\n`. For a deployed site or a development tunnel, set `OAUTH_CALLBACK_BASE_URL` to the
+publicly reachable API base. When the API is exposed through the web app's same-origin proxy, use
+the public site URL with `/api` (for example `https://app.example.com/api`) and register
+`https://app.example.com/api/auth/google/callback` or
+`https://app.example.com/api/auth/apple/callback` with the provider. The callback URL must match
+the provider registration exactly. Also set `NEXT_PUBLIC_SITE_URL` and `API_PROXY_URL` for the
+public site and internal API addresses. The OAuth state cookie follows the callback path so it is
+sent through the `/api` proxy as well.
+
+### Password recovery
+
+Password recovery emails are sent through Resend. Set `RESEND_API_KEY` and `AUTH_FROM_EMAIL` in
+`.env.local`; the sender address must use a domain verified with Resend. Set `NEXT_PUBLIC_SITE_URL`
+to the public site URL so recovery links open on the right domain. A recovery request returns a
+generic response whether or not an account exists. Links expire after 30 minutes, are single-use,
+and are rate-limited. Never put the Resend API key in frontend code or commit it.
 
 ## Connected flows and limitations
 
 - Sign-up and sign-in use a PostgreSQL account and an HTTP-only session cookie.
+- Password recovery uses a one-time email link and updates the account password in PostgreSQL.
 - Signing in resumes your most recently saved return. “Back to interview” reloads its encrypted
   answers; updating the interview recalculates the preview and clears saved filing details so
   they can be reviewed and re-entered.
@@ -75,7 +96,7 @@ to HTTPS addresses.
   [2025 Schedule 1-A](https://www.irs.gov/pub/irs-pdf/f1040s1a.pdf).
 - IRS electronic filing needs separate provider authorization and an approved transmission
   integration. No app action currently sends a return to the IRS.
-- The current sign-in flow does not implement multi-factor authentication or account recovery.
+- The current sign-in flow does not implement multi-factor authentication.
 
 ## Scripts
 
@@ -105,11 +126,12 @@ src/lib/sample-return.ts    Sample data shown by the sample-return link
 
 ## Before launch
 
-- Add multi-factor authentication and account recovery.
+- Add multi-factor authentication.
 - Expand and independently validate the tax calculation engine.
 - Complete deployment-specific Google/Apple setup and a security review.
 - Obtain IRS e-file provider authorization and integrate an approved transmission service before
   enabling electronic filing.
 - Write the Terms of Service and Privacy Policy referenced on the sign-up screen, and have the
   filing declaration reviewed by a tax or legal professional.
+
 # true-north-tax

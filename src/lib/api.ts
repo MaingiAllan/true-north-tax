@@ -2,7 +2,7 @@
  * Small fetch wrapper for the True North API (the Express backend).
  * Cookies carry the session, so every request sends credentials.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const API_URL = '/api';
 
 export class ApiError extends Error {
   status: number;

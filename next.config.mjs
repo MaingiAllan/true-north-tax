@@ -8,6 +8,15 @@ const nextConfig = {
   devIndicators: false,
   distDir: process.env.DIST_DIR || '.next',
   outputFileTracingRoot: projectRoot,
+  async rewrites() {
+    const apiProxyUrl = process.env.API_PROXY_URL || 'http://127.0.0.1:4000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiProxyUrl}/:path*`,
+      },
+    ];
+  },
   images: {
     remotePatterns: imageHosts,
     minimumCacheTTL: 60,

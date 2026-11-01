@@ -17,6 +17,8 @@ const app = express();
 const port = Number(process.env.API_PORT || 4000);
 const apiUrl = process.env.API_PUBLIC_URL || `http://localhost:${port}`;
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4028';
+const oauthCallbackBaseUrl = (process.env.OAUTH_CALLBACK_BASE_URL || apiUrl).replace(/\/$/, '');
+const oauthCookiePath = `${new URL(oauthCallbackBaseUrl).pathname.replace(/\/+$/, '')}/auth`;
 const cookieSecure = process.env.NODE_ENV === 'production';
 const sessionCookie = 'tn_session';
 const oauthCookie = 'tn_oauth';
@@ -37,12 +39,24 @@ if (encryptionKey.length !== 32) {
   );
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+});
 const cookieOptions = (maxAge, pathName = '/') =>
   `Path=${pathName}; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${cookieSecure ? '; Secure' : ''}`;
 
 app.disable('x-powered-by');
-app.set('trust proxy', process.env.TRUST_PROXY === 'true');
+const configuredTrustProxy = process.env.TRUST_PROXY;
+app.set(
+  'trust proxy',
+  configuredTrustProxy === 'true'
+    ? 'loopback'
+    : configuredTrustProxy === 'false' || configuredTrustProxy === ''
+      ? false
+      : (configuredTrustProxy ?? 'loopback')
+);
 app.use(helmet());
 app.use(
   cors({
@@ -62,6 +76,44 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/auth', authLimiter);
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
+
+function passwordIsValid(password) {
+  return (
+    typeof password === 'string' &&
+    password.length >= 12 &&
+    password.length <= 128 &&
+    /[0-9]/.test(password) &&
+    /[!@#$%^&*]/.test(password)
+  );
+}
+
+async function sendPasswordResetEmail(email, resetUrl) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.AUTH_FROM_EMAIL,
+      to: [email],
+      subject: 'Reset your True North password',
+      text: `Use this link to reset your True North password. It expires in 30 minutes.\n\n${resetUrl}\n\nIf you did not request this, you can ignore this email.`,
+      html: `<p>Use this link to reset your True North password. It expires in 30 minutes.</p><p><a href="${resetUrl}">Reset your password</a></p><p>If you did not request this, you can ignore this email.</p>`,
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) {
+    console.error(`Password recovery email delivery failed (Resend HTTP ${response.status}).`);
+    throw new Error('Password recovery email delivery failed.');
+  }
+}
 
 function seal(value) {
   const iv = crypto.randomBytes(12);
@@ -133,6 +185,11 @@ function validEmail(value) {
   return (
     typeof value === 'string' && value.length <= 255 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   );
+}
+
+function oauthErrorUrl(message) {
+  const query = new URLSearchParams({ oauth_error: message });
+  return `/?${query.toString()}`;
 }
 
 function validateInterview(value) {
@@ -271,7 +328,7 @@ function validateFiling(value, needsBankDetails) {
 }
 
 function providerSettings(provider) {
-  const callbackUrl = `${apiUrl}/auth/${provider}/callback`;
+  const callbackUrl = `${oauthCallbackBaseUrl}/auth/${provider}/callback`;
   if (provider === 'google') {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -334,11 +391,7 @@ app.post('/auth/register', async (request, response) => {
     typeof lastName !== 'string' ||
     !lastName.trim() ||
     lastName.length > 100 ||
-    typeof password !== 'string' ||
-    password.length < 12 ||
-    password.length > 128 ||
-    !/[0-9]/.test(password) ||
-    !/[!@#$%^&*]/.test(password)
+    !passwordIsValid(password)
   ) {
     return response
       .status(400)
@@ -395,6 +448,109 @@ app.post('/auth/login', async (request, response) => {
   }
 });
 
+app.post('/auth/password/forgot', passwordResetLimiter, async (request, response) => {
+  const { email } = request.body ?? {};
+  if (!validEmail(email)) {
+    return response.status(400).json({ message: 'Enter a valid email address.' });
+  }
+  if (!process.env.RESEND_API_KEY || !process.env.AUTH_FROM_EMAIL) {
+    return response.status(503).json({
+      message: 'Password recovery is not configured yet. Please contact support.',
+    });
+  }
+
+  const genericResponse = {
+    message: 'If an account exists for that email, a password reset link is on its way.',
+  };
+  try {
+    const result = await pool.query('SELECT id FROM users WHERE email = $1', [
+      email.trim().toLowerCase(),
+    ]);
+    const user = result.rows[0];
+    if (user) {
+      const token = crypto.randomBytes(32).toString('base64url');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      await pool.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
+      await pool.query(
+        `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3)`,
+        [user.id, tokenHash, expiresAt]
+      );
+      const resetUrl = new URL('/reset-password', siteUrl);
+      resetUrl.searchParams.set('token', token);
+      try {
+        await sendPasswordResetEmail(email.trim().toLowerCase(), resetUrl.toString());
+      } catch {
+        console.error('Password recovery email delivery failed.');
+        await pool.query('DELETE FROM password_reset_tokens WHERE token_hash = $1', [tokenHash]);
+      }
+    }
+    return response.json(genericResponse);
+  } catch {
+    console.error('Password recovery request could not be processed.');
+    return response.status(500).json({ message: 'We could not process that request. Try again.' });
+  }
+});
+
+app.post('/auth/password/reset', async (request, response) => {
+  const { token, password } = request.body ?? {};
+  if (
+    typeof token !== 'string' ||
+    !/^[A-Za-z0-9_-]{43}$/.test(token) ||
+    !passwordIsValid(password)
+  ) {
+    return response.status(400).json({
+      message: 'Use a valid reset link and a password that meets the requirements.',
+    });
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  let client;
+  let transactionStarted = false;
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    client = await pool.connect();
+    await client.query('BEGIN');
+    transactionStarted = true;
+    const result = await client.query(
+      `SELECT user_id FROM password_reset_tokens
+       WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP
+       FOR UPDATE`,
+      [tokenHash]
+    );
+    if (!result.rows[0]) {
+      await client.query('ROLLBACK');
+      return response.status(400).json({
+        message: 'This password reset link is invalid or expired. Request a new one.',
+      });
+    }
+    await client.query(
+      `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [passwordHash, result.rows[0].user_id]
+    );
+    await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [
+      result.rows[0].user_id,
+    ]);
+    await client.query('COMMIT');
+    transactionStarted = false;
+    clearCookie(response, sessionCookie);
+    return response.json({ message: 'Your password has been reset. You can now sign in.' });
+  } catch {
+    if (client && transactionStarted) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        console.error('Password reset transaction rollback failed.');
+      }
+    }
+    console.error('Password reset could not be completed.');
+    return response.status(500).json({ message: 'We could not reset your password. Try again.' });
+  } finally {
+    client?.release();
+  }
+});
+
 app.post('/auth/logout', (_request, response) => {
   clearCookie(response, sessionCookie);
   response.status(204).end();
@@ -425,7 +581,7 @@ app.get('/auth/:provider', (request, response) => {
   if (!settings) {
     const name = provider === 'google' ? 'Google' : provider === 'apple' ? 'Apple' : 'This';
     const message = `${name} sign-in is not configured. Add the provider credentials to .env.local.`;
-    return response.redirect(`${siteUrl}/?oauth_error=${encodeURIComponent(message)}`);
+    return response.redirect(oauthErrorUrl(message));
   }
   const state = crypto.randomBytes(32).toString('base64url');
   const nonce = crypto.randomBytes(32).toString('base64url');
@@ -434,7 +590,7 @@ app.get('/auth/:provider', (request, response) => {
   const stateToken = jwt.sign({ state, nonce, verifier, provider }, jwtSecret, {
     expiresIn: '10m',
   });
-  setCookie(response, oauthCookie, stateToken, 600, '/auth');
+  setCookie(response, oauthCookie, stateToken, 600, oauthCookiePath);
 
   const url = new URL(settings.authorizeUrl);
   url.searchParams.set('client_id', settings.clientId);
@@ -453,24 +609,20 @@ app.get('/auth/:provider', (request, response) => {
 app.get('/auth/:provider/callback', async (request, response) => {
   const { provider } = request.params;
   const stateToken = readCookie(request, oauthCookie);
-  clearCookie(response, oauthCookie, '/auth');
+  clearCookie(response, oauthCookie, oauthCookiePath);
   const state = typeof request.query.state === 'string' ? request.query.state : '';
   const code = typeof request.query.code === 'string' ? request.query.code : '';
   if (!stateToken || !state || !code)
-    return response.redirect(
-      `${siteUrl}/?oauth_error=The+sign-in+request+expired.+Please+try+again.`
-    );
+    return response.redirect(oauthErrorUrl('The sign-in request expired. Please try again.'));
 
   try {
     const pending = jwt.verify(stateToken, jwtSecret);
     if (typeof pending === 'string' || pending.provider !== provider || pending.state !== state) {
-      return response.redirect(
-        `${siteUrl}/?oauth_error=Sign-in+could+not+be+verified.+Please+try+again.`
-      );
+      return response.redirect(oauthErrorUrl('Sign-in could not be verified. Please try again.'));
     }
     const settings = providerSettings(provider);
     if (!settings)
-      return response.redirect(`${siteUrl}/?oauth_error=This+sign-in+provider+is+not+configured.`);
+      return response.redirect(oauthErrorUrl('This sign-in provider is not configured.'));
 
     const tokenResponse = await fetch(settings.tokenUrl, {
       method: 'POST',
@@ -542,16 +694,16 @@ app.get('/auth/:provider/callback', async (request, response) => {
     const destination = savedReturn.rows[0]
       ? `/return-review-filing?id=${encodeURIComponent(savedReturn.rows[0].id)}`
       : '/tax-interview';
-    return response.redirect(`${siteUrl}${destination}`);
+    return response.redirect(destination);
   } catch (error) {
     if (error?.code === '23505') {
       return response.redirect(
-        `${siteUrl}/?oauth_error=This+provider+account+is+already+linked+to+another+user.`
+        oauthErrorUrl('This provider account is already linked to another user.')
       );
     }
     console.error('OAuth sign-in failed.');
     return response.redirect(
-      `${siteUrl}/?oauth_error=Sign-in+failed.+Check+provider+configuration+and+try+again.`
+      oauthErrorUrl('Sign-in failed. Check provider configuration and try again.')
     );
   }
 });

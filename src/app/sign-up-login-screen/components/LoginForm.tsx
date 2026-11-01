@@ -217,6 +217,15 @@ export default function LoginForm() {
         )}
       </div>
 
+      <div className="-mt-2 text-right">
+        <Link
+          href="/forgot-password"
+          className="text-sm font-semibold text-primary hover:underline"
+        >
+          Forgot password?
+        </Link>
+      </div>
+
       <div className="flex items-center gap-2">
         <input
           id="remember-me"
