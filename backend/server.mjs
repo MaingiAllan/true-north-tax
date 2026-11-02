@@ -790,12 +790,21 @@ app.get('/returns/:id', requireAuth, async (request, response) => {
   }
   try {
     const result = await pool.query(
-      `SELECT id, calculated_data AS data, status, encrypted_filing_data IS NOT NULL AS "filingDetailsSaved"
+      `SELECT id, calculated_data AS data, status, encrypted_interview_data,
+              encrypted_filing_data IS NOT NULL AS "filingDetailsSaved"
        FROM tax_returns WHERE id = $1 AND user_id = $2`,
       [request.params.id, request.userId]
     );
     if (!result.rows[0]) return response.status(404).json({ message: 'Return not found.' });
-    return response.json(result.rows[0]);
+    const returnRecord = result.rows[0];
+    if (!Array.isArray(returnRecord.data?.forms)) {
+      const forms = returnRecord.encrypted_interview_data
+        ? calculateReturn(unseal(returnRecord.encrypted_interview_data)).forms
+        : [];
+      returnRecord.data = { ...returnRecord.data, forms };
+    }
+    delete returnRecord.encrypted_interview_data;
+    return response.json(returnRecord);
   } catch {
     return response.status(500).json({ message: 'We could not load your return.' });
   }

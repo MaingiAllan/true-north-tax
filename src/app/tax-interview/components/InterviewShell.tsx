@@ -195,7 +195,7 @@ function MoneyInput({
         onChange={(e) => onChange(digitsOnly(e.target.value))}
         aria-invalid={!!error}
         aria-describedby={describedBy(id, hint, error)}
-        className={`form-input-base pl-6 tabular-nums ${error ? 'form-input-error' : ''}`}
+        className={`form-input-base pl-7 tabular-nums ${error ? 'form-input-error' : ''}`}
       />
     </div>
   );
