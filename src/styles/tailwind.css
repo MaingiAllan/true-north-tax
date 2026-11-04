@@ -3,14 +3,19 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
   --background: #f8fafc;
   --foreground: #0f172a;
+  --brand-panel: #1d4ed8;
+  --brand-foreground: #f1f5f9;
+  --brand-muted: #dbeafe;
+  --brand-logo-surface: #f1f5f9;
   --primary: #1d4ed8;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #f1f5f9;
   --secondary: #e2e8f0;
   --secondary-foreground: #334155;
   --accent: #16a34a;
-  --accent-foreground: #ffffff;
+  --accent-foreground: #052e16;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
   --card: #ffffff;
@@ -21,18 +26,94 @@
   --radius: 0.75rem;
   --font-sans: var(--font-plus-jakarta-sans), sans-serif;
   --warning: #d97706;
-  --warning-foreground: #ffffff;
+  --warning-foreground: #422006;
   --danger: #dc2626;
-  --danger-foreground: #ffffff;
+  --danger-foreground: #450a0a;
   --refund-green: #16a34a;
   --owe-red: #dc2626;
 
   /* RGB channels of the tokens above, so Tailwind opacity utilities work (bg-primary/10 etc.) */
   --primary-rgb: 29 78 216;
   --accent-rgb: 22 163 74;
+  --warning-rgb: 217 119 6;
+  --danger-rgb: 220 38 38;
   --muted-rgb: 241 245 249;
   --muted-foreground-rgb: 100 116 139;
   --border-rgb: 226 232 240;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --brand-panel: #1e3a8a;
+  --brand-foreground: #e2e8f0;
+  --brand-muted: #bfdbfe;
+  --brand-logo-surface: #cbd5e1;
+  --primary: #7da6c9;
+  --primary-foreground: #0b1220;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --accent: #7eac8a;
+  --accent-foreground: #102018;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --card: #111c2f;
+  --card-foreground: #e2e8f0;
+  --border: #334155;
+  --input: #475569;
+  --ring: #60a5fa;
+  --warning: #d2b56c;
+  --warning-foreground: #211b0d;
+  --danger: #d98b8b;
+  --danger-foreground: #281515;
+  --refund-green: #7eac8a;
+  --owe-red: #d98b8b;
+  --primary-rgb: 125 166 201;
+  --accent-rgb: 126 172 138;
+  --warning-rgb: 210 181 108;
+  --danger-rgb: 217 139 139;
+  --muted-rgb: 30 41 59;
+  --muted-foreground-rgb: 148 163 184;
+  --border-rgb: 51 65 85;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+    --brand-panel: #1e3a8a;
+    --brand-foreground: #e2e8f0;
+    --brand-muted: #bfdbfe;
+    --brand-logo-surface: #cbd5e1;
+    --primary: #7da6c9;
+    --primary-foreground: #0b1220;
+    --secondary: #1e293b;
+    --secondary-foreground: #e2e8f0;
+    --accent: #7eac8a;
+    --accent-foreground: #102018;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --card: #111c2f;
+    --card-foreground: #e2e8f0;
+    --border: #334155;
+    --input: #475569;
+    --ring: #60a5fa;
+    --warning: #d2b56c;
+    --warning-foreground: #211b0d;
+    --danger: #d98b8b;
+    --danger-foreground: #281515;
+    --refund-green: #7eac8a;
+    --owe-red: #d98b8b;
+    --primary-rgb: 125 166 201;
+    --accent-rgb: 126 172 138;
+    --warning-rgb: 210 181 108;
+    --danger-rgb: 217 139 139;
+    --muted-rgb: 30 41 59;
+    --muted-foreground-rgb: 148 163 184;
+    --border-rgb: 51 65 85;
+  }
 }
 
 @layer base {
@@ -48,6 +129,24 @@
   }
   html {
     scroll-behavior: smooth;
+  }
+  .auth-brand-panel {
+    background: var(--brand-panel);
+  }
+  .auth-brand-primary-text {
+    color: var(--brand-foreground);
+  }
+  .auth-brand-secondary-text {
+    color: var(--brand-muted);
+  }
+  .auth-brand-highlight {
+    background: color-mix(in srgb, var(--brand-foreground) 10%, var(--brand-panel));
+  }
+  .auth-logo-surface {
+    background: var(--brand-logo-surface);
+  }
+  :root[data-theme='dark'] .auth-logo-surface img {
+    filter: brightness(0.92);
   }
   h1,
   h2,
@@ -125,13 +224,46 @@
   }
   .form-input-base:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
+    box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 0.12);
   }
   .form-input-error {
     border-color: var(--danger);
   }
   .form-input-error:focus {
-    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+    box-shadow: 0 0 0 3px rgb(var(--danger-rgb) / 0.12);
+  }
+  .alert-danger {
+    border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--card));
+    background: color-mix(in srgb, var(--danger) 10%, var(--card));
+    color: var(--danger);
+  }
+  .surface-warning {
+    border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+    background: color-mix(in srgb, var(--warning) 12%, var(--card));
+  }
+  .surface-success {
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+    background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  }
+  .surface-danger {
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+    background: color-mix(in srgb, var(--danger) 10%, var(--card));
+  }
+  .status-success {
+    background: color-mix(in srgb, var(--accent) 18%, var(--card));
+    color: var(--accent);
+  }
+  .status-warning {
+    background: color-mix(in srgb, var(--warning) 18%, var(--card));
+    color: var(--warning);
+  }
+  .metric-refund {
+    background: color-mix(in srgb, var(--accent) 9%, var(--card));
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  }
+  .metric-owe {
+    background: color-mix(in srgb, var(--danger) 9%, var(--card));
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
   }
   .badge-base {
     display: inline-flex;
@@ -177,12 +309,12 @@
     outline: none;
   }
   .btn-primary:hover {
-    background: #1e40af;
-    box-shadow: 0 2px 8px rgba(29, 78, 216, 0.3);
+    filter: brightness(0.9);
+    box-shadow: 0 2px 8px rgb(var(--primary-rgb) / 0.3);
   }
   .btn-primary:focus-visible,
   .btn-secondary:focus-visible {
-    box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.35);
+    box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 0.35);
   }
   .btn-primary:active {
     transform: scale(0.97);
@@ -211,7 +343,7 @@
   }
   .btn-secondary:hover {
     background: var(--muted);
-    border-color: #94a3b8;
+    border-color: var(--muted-foreground);
   }
   .btn-secondary:active {
     transform: scale(0.97);
@@ -233,6 +365,26 @@
     border-radius: 9999px;
     background: var(--primary);
     transition: width 400ms ease;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .auth-logo-surface img {
+    filter: brightness(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  .card-elevated,
+  .card-elevated-lg,
+  .form-input-base,
+  .theme-control,
+  .theme-select {
+    transition:
+      background-color 200ms ease,
+      color 200ms ease,
+      border-color 200ms ease;
   }
 }
 

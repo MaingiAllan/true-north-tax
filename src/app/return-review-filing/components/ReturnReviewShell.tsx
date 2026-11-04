@@ -13,6 +13,8 @@ import CreditsDeductionsSummary from './CreditsDeductionsSummary';
 import { SAMPLE_RETURN } from '@/lib/sample-return';
 import type { ReturnData } from '@/lib/sample-return';
 import { api, ApiError } from '@/lib/api';
+import { calculateReturn } from '@/lib/return-calculator.mjs';
+import type { InterviewAnswers } from '@/lib/return-calculator.mjs';
 
 interface ReturnResponse {
   id: string;
@@ -21,9 +23,126 @@ interface ReturnResponse {
   filingDetailsSaved: boolean;
 }
 
+const DEMO_STATUSES = ['single', 'mfj', 'mfs', 'hoh', 'qss'] as const;
+type DemoStatus = (typeof DEMO_STATUSES)[number];
+
+const DEMO_ANSWERS: Record<DemoStatus, InterviewAnswers> = {
+  single: {
+    filingStatus: 'single',
+    firstName: 'Maya',
+    lastName: 'Chen',
+    dob: '1992-04-18',
+    ssn: '',
+    spouseFirstName: '',
+    spouseLastName: '',
+    spouseDob: '',
+    spouseSsn: '',
+    spouseItemizes: '',
+    hasDependents: 'no',
+    dependentCount: '',
+    hasW2: 'yes',
+    w2s: [{ id: 'demo-w2', employer: 'Northstar Studio', wages: '72000', withheld: '8200' }],
+    interest: '240',
+    dividends: '180',
+    studentLoanInterest: '900',
+    hsa: '',
+    ira: '',
+  },
+  mfj: {
+    filingStatus: 'mfj',
+    firstName: 'Jordan',
+    lastName: 'Kim',
+    dob: '1988-09-12',
+    ssn: '',
+    spouseFirstName: 'Avery',
+    spouseLastName: 'Kim',
+    spouseDob: '1989-02-26',
+    spouseSsn: '',
+    spouseItemizes: '',
+    hasDependents: 'yes',
+    dependentCount: '1',
+    hasW2: 'yes',
+    w2s: [{ id: 'demo-w2', employer: 'Pine & Co.', wages: '108000', withheld: '12500' }],
+    interest: '510',
+    dividends: '320',
+    studentLoanInterest: '',
+    hsa: '1800',
+    ira: '',
+  },
+  mfs: {
+    filingStatus: 'mfs',
+    firstName: 'Sam',
+    lastName: 'Rivera',
+    dob: '1985-06-07',
+    ssn: '',
+    spouseFirstName: 'Lee',
+    spouseLastName: 'Rivera',
+    spouseDob: '',
+    spouseSsn: '',
+    spouseItemizes: 'no',
+    hasDependents: 'no',
+    dependentCount: '',
+    hasW2: 'yes',
+    w2s: [{ id: 'demo-w2', employer: 'Cedar Works', wages: '64000', withheld: '7200' }],
+    interest: '125',
+    dividends: '',
+    studentLoanInterest: '',
+    hsa: '',
+    ira: '1500',
+  },
+  hoh: {
+    filingStatus: 'hoh',
+    firstName: 'Taylor',
+    lastName: 'Brooks',
+    dob: '1990-11-03',
+    ssn: '',
+    spouseFirstName: '',
+    spouseLastName: '',
+    spouseDob: '',
+    spouseSsn: '',
+    spouseItemizes: '',
+    hasDependents: 'yes',
+    dependentCount: '1',
+    hasW2: 'yes',
+    w2s: [{ id: 'demo-w2', employer: 'Bluebird Market', wages: '56000', withheld: '5900' }],
+    interest: '95',
+    dividends: '',
+    studentLoanInterest: '',
+    hsa: '',
+    ira: '',
+  },
+  qss: {
+    filingStatus: 'qss',
+    firstName: 'Casey',
+    lastName: 'Morgan',
+    dob: '1987-01-22',
+    ssn: '',
+    spouseFirstName: '',
+    spouseLastName: '',
+    spouseDob: '',
+    spouseSsn: '',
+    spouseItemizes: '',
+    hasDependents: 'yes',
+    dependentCount: '1',
+    hasW2: 'yes',
+    w2s: [{ id: 'demo-w2', employer: 'Summit Supply', wages: '61500', withheld: '6800' }],
+    interest: '210',
+    dividends: '75',
+    studentLoanInterest: '',
+    hsa: '',
+    ira: '',
+  },
+};
+
+function isDemoStatus(value: string | null): value is DemoStatus {
+  return value !== null && DEMO_STATUSES.includes(value as DemoStatus);
+}
+
 export default function ReturnReviewShell() {
   const searchParams = useSearchParams();
   const returnId = searchParams.get('id');
+  const demoStatus = searchParams.get('demo');
+  const demoData = isDemoStatus(demoStatus) ? calculateReturn(DEMO_ANSWERS[demoStatus]) : null;
   const [returnRecord, setReturnRecord] = useState<ReturnResponse | null>(null);
   const [loading, setLoading] = useState(!!returnId);
   const [error, setError] = useState('');
@@ -81,8 +200,9 @@ export default function ReturnReviewShell() {
     );
   }
 
-  const data = returnRecord?.data ?? SAMPLE_RETURN;
+  const data = returnRecord?.data ?? demoData ?? SAMPLE_RETURN;
   const isSample = !returnRecord;
+  const isDemo = !returnRecord && demoData !== null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,13 +210,20 @@ export default function ReturnReviewShell() {
       <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 xl:px-12 2xl:px-16 py-8">
         <div
           role="note"
-          className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-foreground"
+          className="surface-warning mb-6 rounded-lg border px-4 py-3 text-sm text-foreground"
         >
           {isSample ? (
-            <>
-              <span className="font-semibold">This is a sample return.</span> The figures are
-              illustrative and are not based on your answers.
-            </>
+            isDemo ? (
+              <>
+                <span className="font-semibold">Fictional demo return · {data.filingStatus}.</span>{' '}
+                It uses sample answers and contains no Social Security numbers.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">This is a sample return.</span> The figures are
+                illustrative and are not based on your answers.
+              </>
+            )
           ) : (
             <>
               <span className="font-semibold">

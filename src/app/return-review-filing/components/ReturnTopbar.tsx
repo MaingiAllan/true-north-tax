@@ -50,7 +50,7 @@ export default function ReturnTopbar({ taxpayer, taxYear, returnId }: Props) {
           Print / save PDF
         </button>
         <div
-          className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold"
+          className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold"
           aria-label={taxpayer}
         >
           {taxpayer.charAt(0).toUpperCase()}

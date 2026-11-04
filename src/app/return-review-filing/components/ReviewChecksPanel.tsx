@@ -19,13 +19,9 @@ export default function ReviewChecksPanel({ checks }: Props) {
 
       <div className="p-3">
         <div className="flex items-center gap-3 mb-3">
-          <span className="badge-base" style={{ background: '#dcfce7', color: '#15803d' }}>
-            {passCount} passed
-          </span>
+          <span className="badge-base status-success">{passCount} passed</span>
           {reviewCount > 0 && (
-            <span className="badge-base" style={{ background: '#fef3c7', color: '#b45309' }}>
-              {reviewCount} to review
-            </span>
+            <span className="badge-base status-warning">{reviewCount} to review</span>
           )}
         </div>
         <ul className="space-y-1">
@@ -36,7 +32,7 @@ export default function ReviewChecksPanel({ checks }: Props) {
             >
               <div
                 className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                  check.status === 'pass' ? 'bg-green-100' : 'bg-amber-100'
+                  check.status === 'pass' ? 'status-success' : 'status-warning'
                 }`}
               >
                 {check.status === 'pass' ? (

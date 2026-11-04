@@ -40,7 +40,7 @@ export default function ReturnHeroMetrics({ data }: Props) {
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
       <div
         className={`xl:col-span-2 rounded-2xl p-6 border-2 ${
-          isRefund ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+          isRefund ? 'metric-refund' : 'metric-owe'
         }`}
       >
         <p className="text-sm font-semibold text-muted-foreground mb-1">

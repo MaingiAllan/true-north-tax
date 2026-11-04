@@ -124,7 +124,7 @@ export default function EFileSubmissionPanel({
               <li key={item.id} className="flex items-center gap-2.5">
                 <div
                   className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    item.done ? 'bg-green-100' : 'bg-muted border border-border'
+                    item.done ? 'status-success' : 'bg-muted border border-border'
                   }`}
                 >
                   {item.done && <Tick />}
@@ -149,7 +149,7 @@ export default function EFileSubmissionPanel({
         </div>
       ) : saved ? (
         <div className="p-5 space-y-4">
-          <div className="rounded-xl bg-green-50 border border-green-200 p-5">
+          <div className="surface-success rounded-xl border p-5">
             <p className="text-base font-bold text-foreground mb-1">
               Your filing details are saved
             </p>

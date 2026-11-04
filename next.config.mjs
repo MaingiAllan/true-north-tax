@@ -6,7 +6,7 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   devIndicators: false,
-  distDir: process.env.DIST_DIR || '.next',
+  distDir: process.env.DIST_DIR || (process.env.NODE_ENV === 'development' ? '.next-dev' : '.next'),
   outputFileTracingRoot: projectRoot,
   async rewrites() {
     const apiProxyUrl = process.env.API_PROXY_URL || 'http://127.0.0.1:4000';

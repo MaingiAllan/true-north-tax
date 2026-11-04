@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import Script from 'next/script';
+import ThemeControl from '@/components/ui/ThemeControl';
 import '../styles/index.css';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -27,8 +29,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={plusJakartaSans.variable}>
-      <body>{children}</body>
+    <html lang="en" className={plusJakartaSans.variable} suppressHydrationWarning>
+      <body>
+        <Script id="theme-preference-init" strategy="beforeInteractive">
+          {`try {
+            var preference = localStorage.getItem('true-north-theme');
+            if (preference === 'light' || preference === 'dark') {
+              document.documentElement.dataset.theme = preference;
+            }
+          } catch {}`}
+        </Script>
+        {children}
+        <ThemeControl />
+      </body>
     </html>
   );
 }

@@ -56,10 +56,7 @@ export default function SignUpForm({ onSwitchToLogin }: SignUpFormProps) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
       {formError && (
-        <div
-          role="alert"
-          className="rounded-lg px-4 py-3 bg-red-50 border border-red-200 text-danger text-sm font-medium"
-        >
+        <div role="alert" className="alert-danger rounded-lg px-4 py-3 text-sm font-medium">
           {formError}
         </div>
       )}

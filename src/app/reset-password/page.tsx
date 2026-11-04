@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
             </p>
             <form onSubmit={submit} className="space-y-4">
               {error && (
-                <p role="alert" className="rounded-lg px-4 py-3 bg-red-50 text-danger text-sm">
+                <p role="alert" className="alert-danger rounded-lg px-4 py-3 text-sm">
                   {error}
                 </p>
               )}
